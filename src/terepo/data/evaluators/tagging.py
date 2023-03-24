@@ -2,6 +2,7 @@
 Copyright (c) VisualJoyce.
 Licensed under the MIT license.
 """
+import io
 import logging
 import os.path
 import random
@@ -9,11 +10,13 @@ from abc import abstractmethod
 from collections import Counter
 from typing import List
 
+import errant
 import torch
 from tqdm import tqdm
 
 import ChERRANT.compare_m2_for_evaluation as cherrant_compare_m2
 from ChERRANT.parallel_to_m2 import main as cherrant_parallel_to_m2
+from m2scorer import m2scorer_f1_score
 from terepo.data.evaluators import register_evaluator
 from terepo.data.evaluators.base import TERepoBaseEvaluator
 from terepo.data.loaders import move_to_cuda
@@ -254,3 +257,149 @@ class TERepoTaggingChErrantEvaluator(TERepoTaggingBaseEvaluator):
 
         evaluation_arguments = EvaluationArgumentsStub(args_eval.output, args_gold.output)
         return self.compare_m2_for_evaluation(evaluation_arguments)
+
+
+def noop_edit(id=0):
+    return "A -1 -1|||noop|||-NONE-|||REQUIRED|||-NONE-|||" + str(id)
+
+
+def convert_para_to_m2(src_texts, trg_texts, tokenize=False, lev=False, merge="rules", lang=None):
+    """
+
+    :param lang:
+    :param src_texts:
+    :param trg_texts:
+    :param tokenize:
+    :param lev:
+    :param merge: help="Choose a merging strategy for automatic alignment.\n"
+            "rules: Use a rule-based merging strategy (default)\n"
+            "all-split: Merge nothing: MSSDI -> M, S, S, D, I\n"
+            "all-merge: Merge adjacent non-matches: MSSDI -> M, SSDI\n"
+            "all-equal: Merge adjacent same-type non-matches: MSSDI -> M, SS, D, I",
+        choices=["rules", "all-split", "all-merge", "all-equal"],
+    :return:
+    """
+    out_m2 = io.StringIO()
+    annotator = errant.load(lang)
+
+    # Process each line of all input files
+    for orig, cors in zip(src_texts, trg_texts):
+        # Skip the line if orig is empty
+        if not orig: continue
+        # Parse orig with spacy
+        orig = annotator.parse(orig, tokenize)
+        # Write orig to the output m2 file
+        out_m2.write(" ".join(["S"] + [token.text for token in orig]) + "\n")
+        assert isinstance(cors, list)
+        # Loop through the corrected texts
+        for cor_id, cor in enumerate(cors):
+            cor = cor.strip()
+            # If the texts are the same, write a noop edit
+            if orig.text.strip() == cor:
+                out_m2.write(noop_edit(cor_id) + "\n")
+            # Otherwise, do extra processing
+            else:
+                # Parse cor with spacy
+                cor = annotator.parse(cor, tokenize)
+                # Align the texts and extract and classify the edits
+                edits = annotator.annotate(orig, cor, lev, merge)
+                # Loop through the edits
+                for edit in edits:
+                    # Write the edit to the output m2 file
+                    out_m2.write(edit.to_m2(cor_id) + "\n")
+        # Write a newline when we have processed all corrections for each line
+        out_m2.write("\n")
+    return out_m2
+
+
+def paragraphs(lines, is_separator=lambda x: x == '\n', joiner=''.join):
+    paragraph = []
+    for line in lines:
+        if is_separator(line):
+            if paragraph:
+                yield joiner(paragraph)
+                paragraph = []
+        else:
+            paragraph.append(line)
+    if paragraph:
+        yield joiner(paragraph)
+
+
+def convert_para_to_edits(src_texts, trg_texts, lang):
+    gold_edits = []
+    fd = convert_para_to_m2(src_texts, trg_texts, tokenize=True, lang=lang)
+    for item in paragraphs(fd.getvalue().splitlines(True)):
+        item = item.splitlines(False)
+        sentence = [line[2:].strip() for line in item if line.startswith('S ')]
+        assert sentence != []
+        annotations = {}
+        for line in item[1:]:
+            if line.startswith('I ') or line.startswith('S '):
+                continue
+            assert line.startswith('A ')
+            line = line[2:]
+            fields = line.split('|||')
+            start_offset = int(fields[0].split()[0])
+            end_offset = int(fields[0].split()[1])
+            etype = fields[1]
+            if etype == 'noop':
+                start_offset = -1
+                end_offset = -1
+            corrections = [c.strip() if c != '-NONE-' else '' for c in fields[2].split('||')]
+            # NOTE: start and end are *token* offsets
+            original = ' '.join(' '.join(sentence).split()[start_offset:end_offset])
+            annotator = int(fields[5])
+            if annotator not in list(annotations.keys()):
+                annotations[annotator] = []
+            annotations[annotator].append((start_offset, end_offset, original, corrections))
+        tok_offset = 0
+        for this_sentence in sentence:
+            tok_offset += len(this_sentence.split())
+            this_edits = {}
+            for annotator, annotation in annotations.items():
+                this_edits[annotator] = [edit for edit in annotation if
+                                         edit[0] <= tok_offset and edit[1] <= tok_offset and edit[0] >= 0 and edit[
+                                             1] >= 0]
+            if len(this_edits) == 0:
+                this_edits[0] = []
+            gold_edits.append(this_edits)
+    return gold_edits
+
+
+@register_evaluator("tagging", "errant")
+class TERepoErrantEvaluator(TERepoTaggingBaseEvaluator):
+
+    def f1_score(self, src_texts,
+                 pred_texts,
+                 trg_texts, output_dir):
+        max_unchanged_words = 2
+        beta = 0.5
+        ignore_whitespace_casing = False
+        verbose = False
+        very_verbose = False
+
+        src_texts_uniq = {}
+        for s, p, t in zip(src_texts, pred_texts, trg_texts):
+            if s not in src_texts_uniq:
+                src_texts_uniq[s] = p, [t]
+            else:
+                src_texts_uniq[s][1].append(t)
+
+        source_sentences, system_sentences, target_sentences = [], [], []
+        for s, (p, t) in src_texts_uniq.items():
+            source_sentences.append(s)
+            system_sentences.append(p)
+            target_sentences.append(t)
+
+        # load source sentences and gold edits
+        gold_edits = convert_para_to_edits(source_sentences, target_sentences, lang='en')
+        p, r, f1 = m2scorer_f1_score(system_sentences, source_sentences, gold_edits,
+                                     max_unchanged_words, beta, ignore_whitespace_casing, verbose,
+                                     very_verbose)
+        logger.info("Precision   : %.4f" % p)
+        logger.info("Recall      : %.4f" % r)
+        return {
+            'precision': p,
+            'recall': r,
+            'f1': f1
+        }

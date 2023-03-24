@@ -107,7 +107,7 @@ CUDA_VISIBLE_DEVICES=$GPU_ID PYTHONPATH="${WORK_DIR}"/src python3 \
   --eval_loader_names tagging --eval_loader_subnames $MODEL_TYPE \
   --evaluator_subnames $EVALUATOR_SUBNAMES \
   --eval_gold_file "$EVAL_GOLD_FILE" \
-  --model_name_or_path "${WORK_DIR}"/data/pretrained_models/text_editing/"${MODEL_NAME}" $PARA \
+  --model_name_or_path "${MODEL_NAME}" $PARA \
   --model_cls "${MODEL_CLS}" \
   --fp16 --do_train --do_eval \
   --per_device_train_batch_size ${PER_DEVICE_TRAIN_BATCH_SIZE} \
