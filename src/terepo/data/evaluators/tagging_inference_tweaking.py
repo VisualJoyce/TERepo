@@ -9,20 +9,17 @@ from abc import abstractmethod
 from collections import Counter
 from typing import List
 
-import nltk
 import numpy as np
 import torch
-from evaluate import load
-from nltk.translate.bleu_score import corpus_bleu
-from rouge import Rouge
 from tqdm import tqdm
 
 import ChERRANT.compare_m2_for_evaluation as cherrant_compare_m2
 from ChERRANT.parallel_to_m2 import main as cherrant_parallel_to_m2
+from m2scorer import m2scorer_f1_score
 from terepo.data.evaluators import register_evaluator
 from terepo.data.evaluators.base import TERepoBaseEvaluator
+from terepo.data.evaluators.tagging import convert_para_to_edits
 from terepo.data.loaders import move_to_cuda
-from terepo.data.unicode import parse_to_segments
 
 logger = logging.getLogger(__name__)
 
@@ -40,18 +37,18 @@ class TERepoInferenceTweakingBaseEvaluator(TERepoBaseEvaluator):
         for min_error_probability in np.arange(0.3, 0.5, 0.01):
             for confidence_bias in np.arange(0, 0.2, 0.05):
                 label_probs = p_labels.detach().clone()
-                label_probs[:, self.tokenizer.labels_keep_token_id] += confidence_bias
+                label_probs[:, self.feature_extractor.labels_keep_token_id] += confidence_bias
                 if err_prob < min_error_probability:
-                    label_ids = [self.tokenizer.labels_keep_token_id] * label_probs.size(0)
+                    label_ids = [self.feature_extractor.labels_keep_token_id] * label_probs.size(0)
                 else:
                     label_ids = []
                     for i, lp in enumerate(label_probs):
                         prob, idx = torch.max(lp, dim=0)
                         if prob < min_error_probability:
-                            label_ids.append(self.tokenizer.labels_keep_token_id)
+                            label_ids.append(self.feature_extractor.labels_keep_token_id)
                         else:
                             label_ids.append(idx.item())
-                labels = self.tokenizer.convert_ids_to_labels_list(label_ids)
+                labels = self.feature_extractor.convert_ids_to_labels_list([[x] for x in label_ids])
                 ret.append((min_error_probability, confidence_bias, labels))
         return ret
 
@@ -60,13 +57,14 @@ class TERepoInferenceTweakingBaseEvaluator(TERepoBaseEvaluator):
         logits_d.masked_fill_(input_mask.unsqueeze(2) == 0, -1e-9)
         class_probabilities_labels = torch.softmax(logits_labels, dim=-1)
         class_probabilities_d = torch.softmax(logits_d, dim=-1)
-        error_probs = class_probabilities_d[:, :, self.tokenizer.dtags_incorrect_id]
+        error_probs = class_probabilities_d[:, :, self.feature_extractor.dtags_incorrect_id]
         incorrect_prob = torch.max(error_probs, dim=-1)[0]
         for source, s_tokens, t_tokens, golden_label_ids, p_labels, err_prob in zip(sources, input_words, output_words,
                                                                                     golden_labels,
                                                                                     class_probabilities_labels,
                                                                                     incorrect_prob):
-            golden_labels_list = self.tokenizer.convert_ids_to_labels_list(golden_label_ids.detach().tolist())
+            golden_labels_list = self.feature_extractor.convert_ids_to_labels_list(
+                [[x] for x in golden_label_ids.detach().tolist()])
             yield source, s_tokens, t_tokens, golden_labels_list, self.logits_to_labels_thresholded(p_labels, err_prob)
 
     def logits_list_to_labels_thresholded(self, p_labels_list, err_prob):
@@ -76,35 +74,19 @@ class TERepoInferenceTweakingBaseEvaluator(TERepoBaseEvaluator):
                 label_ids = [[] for _ in range(p_labels_list[0].size(0))]
                 for i_step, p_labels in enumerate(p_labels_list):
                     label_probs = p_labels.detach().clone()
-                    label_probs[:, self.tokenizer.labels_keep_token_id] += confidence_bias
+                    label_probs[:, self.feature_extractor.labels_keep_token_id] += confidence_bias
                     if err_prob < min_error_probability and i_step == 0:
-                        label_ids[0] = [self.tokenizer.labels_keep_token_id] * label_probs.size(0)
+                        label_ids[0] = [self.feature_extractor.labels_keep_token_id] * label_probs.size(0)
                     else:
                         for i, lp in enumerate(label_probs):
                             prob, idx = torch.max(lp, dim=0)
                             if prob < min_error_probability:
-                                label_ids[i].append(self.tokenizer.labels_keep_token_id)
+                                label_ids[i].append(self.feature_extractor.labels_keep_token_id)
                             else:
                                 label_ids[i].append(idx.item())
-                labels = self.tokenizer.convert_ids_to_labels_list(label_ids)
+                labels = self.feature_extractor.convert_ids_to_labels_list([[x] for x in label_ids])
                 ret.append((min_error_probability, confidence_bias, labels))
         return ret
-
-    def parse_logits_list(self, sources, input_words, output_words, golden_labels, input_mask, logits_labels, logits_d):
-        logits_labels = [item.masked_fill_(input_mask.unsqueeze(2) == 0, -1e-9) for item in logits_labels]
-        logits_d = [item.masked_fill_(input_mask.unsqueeze(2) == 0, -1e-9) for item in logits_d]
-        class_probabilities_labels = [torch.softmax(item, dim=-1) for item in logits_labels]
-        class_probabilities_d = [torch.softmax(item, dim=-1) for item in logits_d]
-        error_probs = [1 - item[:, :, self.tokenizer.dtags_correct_id] for item in class_probabilities_d]
-        incorrect_prob = torch.max(error_probs[0], dim=-1)[0]
-
-        for i_ex, (source, s_tokens, t_tokens, golden_label_ids, err_prob) in enumerate(
-                zip(sources, input_words, output_words, golden_labels, incorrect_prob)):
-            p_labels_list = [item[i_ex] for item in class_probabilities_labels]
-            # p_tags_list = [item[i_ex] for item in class_probabilities_d]
-            golden_labels_list = self.tokenizer.convert_ids_to_labels_list(golden_label_ids.detach().tolist())
-            yield source, s_tokens, t_tokens, golden_labels_list, self.logits_list_to_labels_thresholded(p_labels_list,
-                                                                                                         err_prob)
 
     def forwards(self, model, loader):
         for step, batch in enumerate(tqdm(loader)):
@@ -112,26 +94,25 @@ class TERepoInferenceTweakingBaseEvaluator(TERepoBaseEvaluator):
             batch = move_to_cuda(batch, device=self.training_args.device)
             outputs = model(**batch, return_dict=True)
 
-            parser = self.parse_logits_list if isinstance(outputs.logits_labels, List) else self.parse_logits
-            for item in parser(sources, input_words, output_words,
-                               batch['labels'],
-                               batch['original_mask'],
-                               outputs.logits_labels,
-                               outputs.logits_d):
+            for item in self.parse_logits(sources, input_words, output_words,
+                                          batch['labels'],
+                                          batch['original_mask'],
+                                          outputs.logits_labels,
+                                          outputs.logits_d):
                 yield item
 
     def __call__(self, model, loader, output_dir):
         src_texts, pred_texts_dict, trg_texts = [], {}, []
         errors = []
         for source, s_tokens, t_tokens, golden_labels, labels_list_all in self.forwards(model, loader):
-            s_sent = self.tokenizer.convert_tokens_to_string(s_tokens[1:])
-            t_sent = self.tokenizer.convert_tokens_to_string(t_tokens[1:])
+            s_sent = self.feature_extractor.convert_tokens_to_string(s_tokens[1:], self.tokenizer)
+            t_sent = self.feature_extractor.convert_tokens_to_string(t_tokens[1:], self.tokenizer)
             src_texts.append(source)
             trg_texts.append(t_sent)
 
             for min_error_probability, confidence_bias, labels_list in labels_list_all:
-                p = self.tokenizer.convert_labels_list_to_sentence(s_tokens, labels_list)
-                p_sent = self.tokenizer.convert_tokens_to_string(p[1:])
+                p = self.feature_extractor.convert_labels_list_to_sentence(s_tokens, labels_list)
+                p_sent = self.feature_extractor.convert_tokens_to_string(p[1:], self.tokenizer)
 
                 pred_texts_dict.setdefault((min_error_probability, confidence_bias), [])
                 pred_texts_dict[(min_error_probability, confidence_bias)].append(p_sent)
@@ -296,3 +277,42 @@ class TERepoInferenceTweakingChErrantEvaluator(TERepoInferenceTweakingBaseEvalua
 
         evaluation_arguments = EvaluationArgumentsStub(args_eval.output, args_gold.output)
         return self.compare_m2_for_evaluation(evaluation_arguments)
+
+
+@register_evaluator("tagging_inference_tweaking", "errant")
+class TERepoInferenceTweakingErrantEvaluator(TERepoInferenceTweakingBaseEvaluator):
+
+    def f1_score(self, src_texts,
+                 pred_texts,
+                 trg_texts, output_dir):
+        max_unchanged_words = 2
+        beta = 0.5
+        ignore_whitespace_casing = False
+        verbose = False
+        very_verbose = False
+
+        src_texts_uniq = {}
+        for s, p, t in zip(src_texts, pred_texts, trg_texts):
+            if s not in src_texts_uniq:
+                src_texts_uniq[s] = p, [t]
+            else:
+                src_texts_uniq[s][1].append(t)
+
+        source_sentences, system_sentences, target_sentences = [], [], []
+        for s, (p, t) in src_texts_uniq.items():
+            source_sentences.append(s)
+            system_sentences.append(p)
+            target_sentences.append(t)
+
+        # load source sentences and gold edits
+        gold_edits = convert_para_to_edits(source_sentences, target_sentences, lang='en')
+        p, r, f1 = m2scorer_f1_score(system_sentences, source_sentences, gold_edits,
+                                     max_unchanged_words, beta, ignore_whitespace_casing, verbose,
+                                     very_verbose)
+        logger.info("Precision   : %.4f" % p)
+        logger.info("Recall      : %.4f" % r)
+        return {
+            'precision': p,
+            'recall': r,
+            'f1': f1
+        }

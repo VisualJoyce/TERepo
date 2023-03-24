@@ -18,21 +18,15 @@ logger = logging.getLogger(__name__)
 
 def main(args):
     # model.resize_token_embeddings(len(tokenizer))
+    model = MODEL_REGISTRY[args.model_cls].from_pretrained(args.model_name_or_path)
+    logger.info(model)
+    config = model.config
+    logger.info("Model configurations %s", config)
 
     best_pt = args.best_pt
     if best_pt:
         logger.info(f"Loading best checkpoint from: {best_pt}")
-        config = GECToRConfig.from_pretrained(os.path.dirname(best_pt))
-        logger.info("Model configurations %s", config)
-        model = MODEL_REGISTRY[args.model_cls].from_pretrained(os.path.dirname(best_pt), config=config)
-        logger.info(model)
         model.load_state_dict(torch.load(best_pt, map_location=model.device), strict=True)
-    else:
-        model = MODEL_REGISTRY[args.model_cls].from_pretrained(args.model_name_or_path)
-        logger.info(model)
-        # config = GECToRConfig.from_pretrained(args.model_name_or_path)
-        config = model.config
-        logger.info("Model configurations %s", config)
 
     model = model.cuda()
 

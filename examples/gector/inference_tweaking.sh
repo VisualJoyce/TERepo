@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-WORK_DIR=$(dirname $(dirname $(readlink -f $0)))
+RUN_FILE=$(readlink -f "$0")
+PROJECT_DIR=$(dirname "$RUN_FILE")
+WORK_DIR=$(dirname $(dirname "$PROJECT_DIR"))
 echo "${WORK_DIR}"
 
 MODEL_CLS=$1
@@ -9,6 +11,7 @@ MODEL_CKPT=$4
 MODEL_TASK=$5
 GPU_ID=$6
 
+EVAL_GOLD_FILE="None"
 if [ "$MODEL_TASK" == "mucgec" ]; then
   LANG=zh
   EVAL_FILES="${WORK_DIR}"/data/annotations/text_editing/zh/mucgec/valid
@@ -26,7 +29,7 @@ elif [ "$MODEL_TASK" == "mcscset" ]; then
   EVALUATOR_SUBNAMES=cherrant
 elif [ "$MODEL_TASK" == "bea2019" ]; then
   LANG=en
-  EVAL_FILES="${WORK_DIR}"/data/annotations/text_editing/en/fce/dev@"${WORK_DIR}"/data/annotations/text_editing/en/fce/test@"${WORK_DIR}"/data/annotations/text_editing/en/wi+locness/dev
+  EVAL_FILES="${WORK_DIR}"/data/annotations/text_editing/en/wi+locness/dev
   EVALUATOR_SUBNAMES=errant
 elif [ "$MODEL_TASK" == "wi+locness" ]; then
   LANG=en
@@ -55,9 +58,9 @@ GPU_TYPE=$(nvidia-smi -q | grep "Product Name" | head -n 1 | awk -F':' '{print $
 if [ "$GPU_TYPE" == "NVIDIA GeForce GTX TITAN X" ]; then
   PER_DEVICE_EVAL_BATCH_SIZE=$BATCH_SIZE
 elif [ "$GPU_TYPE" == "NVIDIA TITAN RTX" ]; then
-  PER_DEVICE_EVAL_BATCH_SIZE=512
+  PER_DEVICE_EVAL_BATCH_SIZE=$BATCH_SIZE
 else
-  PER_DEVICE_EVAL_BATCH_SIZE=512
+  PER_DEVICE_EVAL_BATCH_SIZE=$BATCH_SIZE
 fi
 
 log_file="${CKPT_DIR}"/logs.inference_tweaking.txt
@@ -66,7 +69,7 @@ exec &> >(tee -a "$log_file")
 HOST_GPU_NUM=1
 export LD_LIBRARY_PATH=/home/tanminghuan/anaconda3/lib
 CUDA_VISIBLE_DEVICES=$GPU_ID PYTHONPATH="${WORK_DIR}"/src torchrun --nproc_per_node="$HOST_GPU_NUM" --master_port=2345"${GPU_ID}" \
-  "${WORK_DIR}"/examples/inference_tweaking.py \
+  "${WORK_DIR}"/examples/gector/inference_tweaking.py \
   --eval_files "${EVAL_FILES}" \
   --eval_loader_names tagging_inference_tweaking --eval_loader_subnames gector \
   --evaluator_subnames $EVALUATOR_SUBNAMES \
