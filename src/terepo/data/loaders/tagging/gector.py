@@ -1,6 +1,7 @@
 import json
 import logging
 import random
+from abc import abstractmethod
 
 import torch
 import webdataset as wds
@@ -11,19 +12,28 @@ from transformers import PretrainedConfig
 
 from terepo.arguments import TERepoModelArguments, TERepoTrainingArguments, TERepoDataArguments
 from terepo.data.loaders import register_loader, register_eval_loader
-from terepo.data.loaders.tagging.base import TERepoBaseDataLoader
+from terepo.data.loaders.tagging.base import TERepoTaggingBaseDataLoader
 from terepo.utils.misc import pad_tensors
 
 logger = logging.getLogger(__name__)
 
 
-class TERepoGECToRBaseDataLoader(TERepoBaseDataLoader):
+class TERepoGECToRBaseDataLoader(TERepoTaggingBaseDataLoader):
     def __init__(self, tokenizer, feature_extractor, data_files,
                  model_args: TERepoModelArguments, training_args: TERepoTrainingArguments,
                  data_args: TERepoDataArguments, config: PretrainedConfig):
         super().__init__(tokenizer, feature_extractor, data_files, model_args, training_args, data_args, config)
         self.n_ctx = self.data_args.block_size
         self._tag_strategy = "keep_one"
+
+    @abstractmethod
+    def build_sample(self, example):
+        raise NotImplementedError
+
+    @staticmethod
+    @abstractmethod
+    def collate_fn(inputs):
+        raise NotImplementedError
 
     def _build_sample(self, source_sequence, target_sequence):
         source_tokens = self.feature_extractor.convert_sequence_to_tokens(source_sequence, self.tokenizer)[:self.n_ctx]
@@ -104,27 +114,28 @@ class TERepoGECToRDataLoader(TERepoGECToRBaseDataLoader):
                  'labels': label_ids}
         return batch
 
-    def __iter__(self):
+    def check_sample(self, item):
+        data = json.loads(item['json'])
+        source_sequence = data['source']
+        target_sequence = data['target']
 
-        def check(item):
-            data = json.loads(item['json'])
-            source_sequence = data['source']
-            target_sequence = data['target']
-
-            if isinstance(source_sequence, list):
-                return True
-
-            if not source_sequence.strip() or not target_sequence.strip():
-                return False
-
-            if source_sequence.strip() == target_sequence.strip():
-                if random.random() < self.data_args.use_correct_lines_prob:
-                    return False
+        if isinstance(source_sequence, list):
             return True
+
+        if not source_sequence.strip() or not target_sequence.strip():
+            return False
+
+        if source_sequence.strip() == target_sequence.strip():
+            if random.random() < self.data_args.use_correct_lines_prob:
+                return False
+        return True
+
+    def __iter__(self):
 
         assert len(self.shards) >= self.training_args.world_size  # guarantee at least one shard for each device
         logging.info(f"Constructing data loader for text editing: {len(self.shards)}")
-        dataset = wds.WebDataset(self.shards, nodesplitter=wds.split_by_node).shuffle(1000).select(check).decode().map(
+        dataset = wds.WebDataset(self.shards, nodesplitter=wds.split_by_node).shuffle(1000).select(
+            self.check_sample).decode().map(
             self.wrap_build_sample)
         for batch in DataLoader(dataset, num_workers=self.training_args.train_num_workers, batch_size=self.batch_size,
                                 collate_fn=self.collate_fn):

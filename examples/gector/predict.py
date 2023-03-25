@@ -4,14 +4,13 @@ Licensed under the MIT license.
 """
 import argparse
 import logging
-import os
 
 import torch
 from transformers import AutoTokenizer
 
 from terepo.data.predictors import TERepoPredictor
 from terepo.models import MODEL_REGISTRY
-from terepo.models.tagging import GECToRFeatureExtractor, GECToRConfig
+from terepo.models.tagging import GECToRFeatureExtractor
 
 logger = logging.getLogger(__name__)
 

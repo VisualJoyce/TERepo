@@ -102,7 +102,7 @@ else
     for ((i = 0; i < ${array_length}; i++)); do
       SERVER=${host_array[$i]}
       echo "index: $i, value: $SERVER"
-      rsync -av --exclude='*.bin' --exclude='*.pt' --exclude='*.tar' "$SERVER":Data/output /home/tanminghuan/Data
+      rsync -av --exclude='*.bin' --exclude='*.pt' --exclude='*.ckpt' --exclude='*.tar' "$SERVER":Data/output /home/tanminghuan/Data
       scp "${SERVER}":"${CKPT_DIR}"/pytorch_model.bin "${CKPT_DIR}"
     done
   fi
@@ -115,8 +115,8 @@ exec &> >(tee -a "$log_file")
 set -x
 
 export LD_LIBRARY_PATH=/home/tanminghuan/anaconda3/lib
-CUDA_VISIBLE_DEVICES=$GPU_ID PYTHONPATH="${WORK_DIR}"/src python3.9 "${PROJECT_DIR_DIR}"/predict.py \
-  --model_name_or_path "${WORK_DIR}"/data/pretrained_models/text_editing/"${MODEL_NAME}" ${BEST_PT} \
+CUDA_VISIBLE_DEVICES=$GPU_ID PYTHONPATH="${WORK_DIR}"/src python3.9 "${PROJECT_DIR}"/predict.py \
+  --model_name_or_path "${MODEL_NAME}" ${BEST_PT} \
   --predictor tagging --predictor_subname gector --task "$EVAL_TASK" \
   --model_cls "${MODEL_CLS}" \
   --input_file "$INPUT_FILE" \

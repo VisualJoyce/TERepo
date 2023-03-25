@@ -9,7 +9,7 @@ from terepo.data.loaders.base import TERepoBaseDataLoader
 logger = logging.getLogger(__name__)
 
 
-class TERepoBaseDataLoader(TERepoBaseDataLoader):
+class TERepoTaggingBaseDataLoader(TERepoBaseDataLoader):
     def __init__(self, tokenizer, feature_extractor, data_files,
                  model_args: TERepoModelArguments, training_args: TERepoTrainingArguments,
                  data_args: TERepoDataArguments, config: PretrainedConfig):

@@ -9,7 +9,7 @@ import json
 import logging
 import random
 from dataclasses import dataclass
-from typing import Optional, Any, Tuple, Union
+from typing import Optional, Any, Tuple
 
 from transformers import PretrainedConfig
 
@@ -27,7 +27,7 @@ class TERepoBaseDataLoader(metaclass=abc.ABCMeta):
                  data_files,
                  model_args: TERepoModelArguments,
                  training_args: TERepoTrainingArguments,
-                 data_args: Union[TERepoDataArguments, TERepoDataArguments],
+                 data_args: TERepoDataArguments,
                  config: PretrainedConfig):
         self.tokenizer = tokenizer
         self.model_args = model_args
