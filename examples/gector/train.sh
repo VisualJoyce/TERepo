@@ -58,7 +58,7 @@ elif [ "$TASK" == "bea2019" ]; then
   EVAL_FILES="${WORK_DIR}"/data/annotations/text_editing/en/fce/dev@"${WORK_DIR}"/data/annotations/text_editing/en/fce/test@"${WORK_DIR}"/data/annotations/text_editing/en/wi+locness/dev
   EVALUATOR_SUBNAMES=errant
   MAX_STEPS=30000
-  LEARNING_RATE=1e-6
+  LEARNING_RATE=5e-5
 elif [ "$TASK" == "wi+locness" ]; then
   LANG=en
   TRAIN_FILES="${WORK_DIR}"/data/annotations/text_editing/en/wi+locness/train

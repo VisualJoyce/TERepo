@@ -119,14 +119,21 @@ class TERepoGECToRDataLoader(TERepoGECToRBaseDataLoader):
         source_sequence = data['source']
         target_sequence = data['target']
 
+        # Input is a list of sequences, then no check is needed
         if isinstance(source_sequence, list):
             return True
 
+        # If source or target is empty, then drop the sample
         if not source_sequence.strip() or not target_sequence.strip():
             return False
 
         if source_sequence.strip() == target_sequence.strip():
+            # If no changes are required,
             if random.random() < self.data_args.use_correct_lines_prob:
+                # Keep the sample
+                return True
+            else:
+                # Drop the sample
                 return False
         return True
 
