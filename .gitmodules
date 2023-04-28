@@ -1,0 +1,60 @@
+[submodule "related_repos/CPN"]
+	path = related_repos/CPN
+	url = https://github.com/sunnyqiny/Confusionset-guided-Pointer-Networks-for-Chinese-Spelling-Check.git
+[submodule "related_repos/CRASpell"]
+	path = related_repos/CRASpell
+	url = https://github.com/liushulinle/CRASpell.git
+[submodule "related_repos/DCN"]
+	path = related_repos/DCN
+	url = https://github.com/destwang/DCN.git
+[submodule "related_repos/FASPell"]
+	path = related_repos/FASPell
+	url = https://github.com/iqiyi/FASPell.git
+[submodule "related_repos/FCGEC"]
+	path = related_repos/FCGEC
+	url = https://github.com/xlxwalex/FCGEC.git
+[submodule "related_repos/GECToR"]
+	path = related_repos/GECToR
+	url = https://github.com/grammarly/gector.git
+[submodule "related_repos/GECToR-large"]
+	path = related_repos/GECToR-large
+	url = https://github.com/MaksTarnavskyi/gector-large.git
+[submodule "related_repos/HCT"]
+	path = related_repos/HCT
+	url = https://github.com/lisjin/hct.git
+[submodule "related_repos/LaserTagger"]
+	path = related_repos/LaserTagger
+	url = https://github.com/google-research/lasertagger.git
+[submodule "related_repos/DPCSpell"]
+	path = related_repos/DPCSpell
+	url = https://github.com/mehedihasanbijoy/DPCSpell.git
+[submodule "related_repos/MDCSpell"]
+	path = related_repos/MDCSpell
+	url = https://github.com/iioSnail/MDCSpell_pytorch.git
+[submodule "related_repos/PIE"]
+	path = related_repos/PIE
+	url = https://github.com/awasthiabhijeet/PIE.git
+[submodule "related_repos/PLOME"]
+	path = related_repos/PLOME
+	url = https://github.com/liushulinle/PLOME.git
+[submodule "related_repos/ReaLiSe"]
+	path = related_repos/ReaLiSe
+	url = https://github.com/DaDaMrX/ReaLiSe.git
+[submodule "related_repos/SAD"]
+	path = related_repos/SAD
+	url = https://github.com/AutoTemp/Shallow-Aggressive-Decoding.git
+[submodule "related_repos/SpellGCN"]
+	path = related_repos/SpellGCN
+	url = https://github.com/ACL2020SpellGCN/SpellGCN.git
+[submodule "related_repos/SynGEC"]
+	path = related_repos/SynGEC
+	url = https://github.com/HillZhang1999/SynGEC.git
+[submodule "related_repos/TtT"]
+	path = related_repos/TtT
+	url = https://github.com/lipiji/TtT.git
+[submodule "related_repos/EaE"]
+	path = related_repos/EaE
+	url = https://github.com/FDChongLi/TwoWaysToImproveCSC.git
+[submodule "related_repos/VSL"]
+	path = related_repos/VSL
+	url = https://github.com/mingdachen/vsl.git

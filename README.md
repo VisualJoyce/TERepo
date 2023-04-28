@@ -1,5 +1,7 @@
-Transformers4TE
+TERepo
 ===============
+
+A Text Editing Repository for reproduction and innovation.
 
 Preprocessing
 -------------
