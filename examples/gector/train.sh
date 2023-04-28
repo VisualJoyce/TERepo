@@ -55,8 +55,8 @@ elif [ "$TASK" == "mcscset" ]; then
 elif [ "$TASK" == "bea2019" ]; then
   LANG=en
   TRAIN_FILES="${WORK_DIR}"/data/annotations/text_editing/en/fce/train:"${WORK_DIR}"/data/annotations/text_editing/en/lang8/train:"${WORK_DIR}"/data/annotations/text_editing/en/nucle/train:"${WORK_DIR}"/data/annotations/text_editing/en/wi+locness/train
-  EVAL_FILES="${WORK_DIR}"/data/annotations/text_editing/en/fce/dev@"${WORK_DIR}"/data/annotations/text_editing/en/fce/test@"${WORK_DIR}"/data/annotations/text_editing/en/wi+locness/dev
-  EVALUATOR_SUBNAMES=errant
+  EVAL_FILES="${WORK_DIR}"/data/annotations/text_editing/en/fce/dev@"${WORK_DIR}"/data/annotations/text_editing/en/fce/test@"${WORK_DIR}"/data/annotations/text_editing/en/wi+locness/dev@"${WORK_DIR}"/data/annotations/text_editing/en/conll2014/test
+  EVALUATOR_SUBNAMES=m2scorer
   MAX_STEPS=30000
   LEARNING_RATE=5e-5
 elif [ "$TASK" == "wi+locness" ]; then

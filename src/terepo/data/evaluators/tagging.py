@@ -7,13 +7,15 @@ import logging
 import os.path
 import random
 from abc import abstractmethod
-from collections import Counter
+from collections import Counter, OrderedDict
 from typing import List
 
 import errant
 import torch
 from tqdm import tqdm
 
+from errant.commands.compare_m2 import simplify_edits, process_edits, merge_dict, evaluate_edits, print_results, \
+    computeFScore
 import ChERRANT.compare_m2_for_evaluation as cherrant_compare_m2
 from ChERRANT.parallel_to_m2 import main as cherrant_parallel_to_m2
 from m2scorer import m2scorer_f1_score
@@ -366,8 +368,8 @@ def convert_para_to_edits(src_texts, trg_texts, lang):
     return gold_edits
 
 
-@register_evaluator("tagging", "errant")
-class TERepoErrantEvaluator(TERepoTaggingBaseEvaluator):
+@register_evaluator("tagging", "m2scorer")
+class TERepoM2ScorerEvaluator(TERepoTaggingBaseEvaluator):
 
     def f1_score(self, src_texts,
                  pred_texts,
@@ -398,6 +400,130 @@ class TERepoErrantEvaluator(TERepoTaggingBaseEvaluator):
                                      very_verbose)
         logger.info("Precision   : %.4f" % p)
         logger.info("Recall      : %.4f" % r)
+        return {
+            'precision': p,
+            'recall': r,
+            'f1': f1
+        }
+
+
+@register_evaluator("tagging", "errant")
+class TERepoErrantEvaluator(TERepoTaggingBaseEvaluator):
+
+    def parallel_to_m2(self, source_sentences, system_sentences, output_dir):
+        # Input: A coder id
+        # Output: A noop edit; i.e. text contains no edits
+        def noop_edit(id=0):
+            return "A -1 -1|||noop|||-NONE-|||REQUIRED|||-NONE-|||" + str(id)
+
+        class ArgumentsStub:
+            out = os.path.join(output_dir, 'prediction.m2')
+            tok = False
+            lev = False
+            merge = 'rules'
+
+        args = ArgumentsStub()
+
+        print("Loading resources...")
+        # Load Errant
+        annotator = errant.load("en")
+
+        print("Processing parallel files...")
+        # Process an arbitrary number of files line by line simultaneously. Python 3.3+
+        # See https://tinyurl.com/y4cj4gth . Also opens the output m2 file.
+        with open(args.out, "w") as out_m2:
+            # Process each line of all input files
+            for orig, cors in tqdm(zip(source_sentences, system_sentences), total=len(source_sentences)):
+                # Skip the line if orig is empty
+                if not orig: continue
+                # Parse orig with spacy
+                orig = annotator.parse(orig, args.tok)
+                # Write orig to the output m2 file
+                out_m2.write(" ".join(["S"] + [token.text for token in orig]) + "\n")
+                # Loop through the corrected texts
+                for cor_id, cor in enumerate(cors):
+                    cor = cor.strip()
+                    # If the texts are the same, write a noop edit
+                    if orig.text.strip() == cor:
+                        out_m2.write(noop_edit(cor_id) + "\n")
+                    # Otherwise, do extra processing
+                    else:
+                        # Parse cor with spacy
+                        cor = annotator.parse(cor, args.tok)
+                        # Align the texts and extract and classify the edits
+                        edits = annotator.annotate(orig, cor, args.lev, args.merge)
+                        # Loop through the edits
+                        for edit in edits:
+                            # Write the edit to the output m2 file
+                            out_m2.write(edit.to_m2(cor_id) + "\n")
+                # Write a newline when we have processed all corrections for each line
+                out_m2.write("\n")
+
+    def compare_m2(self, output_dir):
+        class ArgumentsStub:
+            hyp = os.path.join(output_dir, 'prediction.m2')
+            ref = self.data_args.eval_gold_file
+            beta = 0.5
+            verbose = False
+            dt = False
+            ds = False
+            cs = False
+            cse = False
+            single = False
+            multi = False
+            filt = []
+            cat = None
+
+        # Parse command line args
+        args = ArgumentsStub()
+        # Open hypothesis and reference m2 files and split into chunks
+        hyp_m2 = open(args.hyp).read().strip().split("\n\n")
+        ref_m2 = open(args.ref).read().strip().split("\n\n")
+        # Make sure they have the same number of sentences
+        assert len(hyp_m2) == len(ref_m2)
+
+        # Store global corpus level best counts here
+        best_dict = Counter({"tp": 0, "fp": 0, "fn": 0})
+        best_cats = {}
+        # Process each sentence
+        sents = zip(hyp_m2, ref_m2)
+        for sent_id, sent in enumerate(sents):
+            # Simplify the edits into lists of lists
+            hyp_edits = simplify_edits(sent[0])
+            ref_edits = simplify_edits(sent[1])
+            # Process the edits for detection/correction based on args
+            hyp_dict = process_edits(hyp_edits, args)
+            ref_dict = process_edits(ref_edits, args)
+            # original sentence for logging
+            original_sentence = sent[0][2:].split("\nA")[0]
+            # Evaluate edits and get best TP, FP, FN hyp+ref combo.
+            count_dict, cat_dict = evaluate_edits(
+                hyp_dict, ref_dict, best_dict, sent_id, original_sentence, args)
+            # Merge these dicts with best_dict and best_cats
+            best_dict += Counter(count_dict)
+            best_cats = merge_dict(best_cats, cat_dict)
+        # Print results
+        print_results(best_dict, best_cats, args)
+        return computeFScore(best_dict["tp"], best_dict["fp"], best_dict["fn"], args.beta)
+
+    def f1_score(self, src_texts,
+                 pred_texts,
+                 trg_texts, output_dir):
+        src_texts_uniq = OrderedDict()
+        for s, p, t in zip(src_texts, pred_texts, trg_texts):
+            if s not in src_texts_uniq:
+                src_texts_uniq[s] = p, [t]
+            else:
+                src_texts_uniq[s][1].append(t)
+
+        source_sentences, system_sentences, target_sentences = [], [], []
+        for s, (p, t) in src_texts_uniq.items():
+            source_sentences.append(s)
+            system_sentences.append(p)
+            target_sentences.append(t)
+
+        self.parallel_to_m2(source_sentences, system_sentences, output_dir)
+        p, r, f1 = self.compare_m2(output_dir)
         return {
             'precision': p,
             'recall': r,
