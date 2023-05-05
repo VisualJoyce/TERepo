@@ -3,6 +3,7 @@ Copyright (c) VisualJoyce.
 Licensed under the MIT license.
 """
 import logging
+from collections import Counter
 
 import numpy as np
 from transformers import PretrainedConfig
@@ -24,6 +25,7 @@ class TERepoBaseEvaluator:
         self.training_args = training_args
         self.data_args = data_args
         self.config = config
+        self.metrics = Counter()
 
     @staticmethod
     def f1(precision, recall):

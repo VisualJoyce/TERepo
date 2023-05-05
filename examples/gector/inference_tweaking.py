@@ -1,5 +1,5 @@
 """
-Copyright (c) Anonymized.
+Copyright (c) VisualJoyce.
 Licensed under the MIT license.
 """
 import logging

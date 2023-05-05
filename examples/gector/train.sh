@@ -8,7 +8,7 @@ echo "${UUID}"
 
 MODEL_CLS=$1
 MODEL_NAME=$2
-GPU_ID=$3
+GPU_IDS=$3
 TASK=$4
 PARA=$5
 #  PARA="--focal_gamma 3 "
@@ -25,6 +25,11 @@ fi
 MAX_STEPS=200000
 STEPS=1000
 LEARNING_RATE=1e-5
+PYTHON_BIN=$(which python)
+ANACONDA_PATH=${PYTHON_BIN%%/bin/python}
+NUM_GPU=$((1+$(echo "$GPU_IDS"| tr -d -c ',' | wc -m)))
+PORT=$(echo "$GPU_IDS" | python -c "import sys;print(sum(map(int,sys.stdin.read().split(','))))")
+MASTER_PORT=$((23456+PORT))
 
 if [ "$TASK" == "mucgec" ]; then
   LANG=zh
@@ -54,7 +59,7 @@ elif [ "$TASK" == "mcscset" ]; then
   STEPS=100
 elif [ "$TASK" == "bea2019" ]; then
   LANG=en
-  TRAIN_FILES="${WORK_DIR}"/data/annotations/text_editing/en/fce/train:"${WORK_DIR}"/data/annotations/text_editing/en/lang8/train:"${WORK_DIR}"/data/annotations/text_editing/en/nucle/train:"${WORK_DIR}"/data/annotations/text_editing/en/wi+locness/train
+  TRAIN_FILES="${WORK_DIR}"/data/annotations/text_editing/en/synthetic/train:"${WORK_DIR}"/data/annotations/text_editing/en/fce/train:"${WORK_DIR}"/data/annotations/text_editing/en/lang8/train:"${WORK_DIR}"/data/annotations/text_editing/en/nucle/train:"${WORK_DIR}"/data/annotations/text_editing/en/wi+locness/train
   EVAL_FILES="${WORK_DIR}"/data/annotations/text_editing/en/fce/dev@"${WORK_DIR}"/data/annotations/text_editing/en/fce/test@"${WORK_DIR}"/data/annotations/text_editing/en/wi+locness/dev@"${WORK_DIR}"/data/annotations/text_editing/en/conll2014/test
   EVALUATOR_SUBNAMES=m2scorer
   MAX_STEPS=30000
@@ -90,7 +95,7 @@ else
   PER_DEVICE_TRAIN_BATCH_SIZE=32
 fi
 
-GRADIENT_ACCUMULATION_STEPS=$((BATCH_SIZE/PER_DEVICE_TRAIN_BATCH_SIZE))
+GRADIENT_ACCUMULATION_STEPS=$((BATCH_SIZE/PER_DEVICE_TRAIN_BATCH_SIZE/NUM_GPU))
 
 mkdir -p "${MODEL_DIR}"/logs
 log_file="${MODEL_DIR}"/logs/train.txt
@@ -99,9 +104,9 @@ exec &> >(tee -a "$log_file")
 set -x
 
 #HOST_GPU_NUM=1
-export LD_LIBRARY_PATH=/home/tanminghuan/anaconda3/lib
-#CUDA_VISIBLE_DEVICES=$GPU_ID PYTHONPATH="${WORK_DIR}"/src torchrun --nproc_per_node="$HOST_GPU_NUM" --master_port=2345"${GPU_ID}" \
-CUDA_VISIBLE_DEVICES=$GPU_ID PYTHONPATH="${WORK_DIR}"/src python3 \
+export LD_LIBRARY_PATH=$ANACONDA_PATH/lib
+#CUDA_VISIBLE_DEVICES=$GPU_IDS PYTHONPATH="${WORK_DIR}"/src python3 \
+CUDA_VISIBLE_DEVICES=$GPU_IDS PYTHONPATH="${WORK_DIR}"/src torchrun --nproc_per_node="$NUM_GPU" --master_port=$MASTER_PORT \
   "${PROJECT_DIR}"/train.py \
   --train_files "${TRAIN_FILES}" \
   --train_loader_names tagging --train_loader_subnames $MODEL_TYPE \

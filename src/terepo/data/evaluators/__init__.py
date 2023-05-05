@@ -7,6 +7,7 @@ import logging
 import os
 
 import torch
+import wandb
 from transformers import PretrainedConfig, BertForSequenceClassification
 
 from terepo.arguments import TERepoModelArguments, TERepoTrainingArguments, TERepoDataArguments
@@ -174,7 +175,8 @@ class TERepoEvaluator(object):
             model.eval()
 
             eval_name = f'{ev or ""}_{"-".join(ef.split(os.path.sep)[-2:])}'
-            for k, v in evaluator(model, loader, output_dir).items():
+            evaluator(model, loader, output_dir)
+            for k, v in evaluator.metrics.items():
                 if k == 'submission':
                     with open(os.path.join(output_dir, f'submission-{m}-{split}.txt'), 'w') as f:
                         f.write(v.getvalue())

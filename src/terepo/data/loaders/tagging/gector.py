@@ -209,11 +209,16 @@ class TERepoGECToREvalDataLoader(TERepoGECToRBaseDataLoader):
         }
         return batch
 
+    @staticmethod
+    def nodesplitter(src, group=None):
+        for s in src:
+            yield s
+
     def __iter__(self):
         # assert len(self.shards) >= self.training_args.world_size  # guarantee at least one shard for each device
         logger.info(f"Constructing data loader for text editing: {len(self.shards)}")
         if self.training_args.local_rank != -1:
-            dataset = wds.WebDataset(self.shards, nodesplitter=wds.split_by_node).decode().map(
+            dataset = wds.WebDataset(self.shards, nodesplitter=self.nodesplitter).decode().map(
                 self.wrap_build_sample)
         else:
             dataset = wds.WebDataset(self.shards).decode().map(self.wrap_build_sample)

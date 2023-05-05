@@ -76,6 +76,12 @@ class TERepoTaggingBaseEvaluator(TERepoBaseEvaluator):
             batch = move_to_cuda(batch, device=self.training_args.device)
             outputs = model(**batch, return_dict=True)
 
+            self.metrics.update({
+                'loss': outputs.loss.item(),
+                'loss_d': outputs.loss_d.item(),
+                'loss_labels': outputs.loss_labels.item()
+            })
+
             # class_probabilities_labels = torch.softmax(outputs.logits_labels, dim=-1)
             # class_probabilities_d = torch.softmax(outputs.logits_d, dim=-1)
             # error_probs = class_probabilities_d[:, :, self.tokenizer.dtags_incorrect_id] * mask
@@ -258,7 +264,9 @@ class TERepoTaggingChErrantEvaluator(TERepoTaggingBaseEvaluator):
                 self.ref = ref
 
         evaluation_arguments = EvaluationArgumentsStub(args_eval.output, args_gold.output)
-        return self.compare_m2_for_evaluation(evaluation_arguments)
+        scores = self.compare_m2_for_evaluation(evaluation_arguments)
+        self.metrics.update(scores)
+        return scores
 
 
 def noop_edit(id=0):
@@ -400,11 +408,13 @@ class TERepoM2ScorerEvaluator(TERepoTaggingBaseEvaluator):
                                      very_verbose)
         logger.info("Precision   : %.4f" % p)
         logger.info("Recall      : %.4f" % r)
-        return {
+        scores = {
             'precision': p,
             'recall': r,
             'f1': f1
         }
+        self.metrics.update(scores)
+        return scores
 
 
 @register_evaluator("tagging", "errant")
@@ -524,8 +534,10 @@ class TERepoErrantEvaluator(TERepoTaggingBaseEvaluator):
 
         self.parallel_to_m2(source_sentences, system_sentences, output_dir)
         p, r, f1 = self.compare_m2(output_dir)
-        return {
+        scores = {
             'precision': p,
             'recall': r,
             'f1': f1
         }
+        self.metrics.update(scores)
+        return scores

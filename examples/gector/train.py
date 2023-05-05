@@ -1,5 +1,5 @@
 """
-Copyright (c) Anonymized.
+Copyright (c) VisualJoyce.
 Licensed under the MIT license.
 """
 import logging
@@ -9,6 +9,7 @@ from dataclasses import field, dataclass
 from typing import Optional
 
 import torch
+import wandb
 from torch.cuda.amp import autocast
 from torch.optim import AdamW
 from tqdm import tqdm
@@ -143,6 +144,18 @@ def main():
     logger.info("Training/evaluation parameters %s", training_args)
     logger.info("Data parameters %s", data_args)
 
+    wandb.init(
+        # set the wandb project where this run will be logged
+        entity="visualjoyce",
+        project=f"{model_args.model_cls}",
+        # track hyperparameters and run metadata
+        config={
+            "learning_rate": training_args.learning_rate,
+            "dataset": data_args.train_files,
+            "steps": training_args.max_steps,
+        }
+    )
+
     # set_seed(training_args.seed)
     set_seed(training_args.seed + training_args.process_index)
 
@@ -247,12 +260,25 @@ def main():
 
             for k, v in loss_counter.items():
                 TB_LOGGER.add_scalar(f'train/{k}', v, global_step)
+                wandb.log({
+                    f"train/{k}": v,
+                }, step=global_step)
             TB_LOGGER.add_scalar('train/grad_norm', total_norm, global_step)
             TB_LOGGER.add_scalar('train/focal_gamma', config.focal_gamma, global_step)
+            wandb.log({
+                f"train/grad_norm": total_norm,
+                f"train/focal_gamma": config.focal_gamma,
+            }, step=global_step)
             for k, v in train_data.all_epochs.items():
                 TB_LOGGER.add_scalar(f'train/{k}', v, global_step)
+                wandb.log({
+                    f"train/{k}": v,
+                }, step=global_step)
             for gid, group in enumerate(optimizer.param_groups):
                 TB_LOGGER.add_scalar(f'train/lr_{gid}', group['lr'], global_step)
+                wandb.log({
+                    f"train/lr_{gid}": group['lr'],
+                }, step=global_step)
             TB_LOGGER.step()
 
             if global_step % training_args.save_steps == 0:
@@ -269,6 +295,9 @@ def main():
                     metrics = evaluator.evaluate(model, ckpt_output_dir)
                     for k, v in metrics.items():
                         TB_LOGGER.add_scalar(f'eval/{k}', v, global_step)
+                        wandb.log({
+                            f"eval/{k}": v,
+                        }, step=global_step)
 
             if global_step > training_args.max_steps:
                 break
