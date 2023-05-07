@@ -1,5 +1,5 @@
 """
-Copyright (c) VisualJoyce.
+Copyright (c) Anonymized.
 Licensed under the MIT license.
 """
 import argparse

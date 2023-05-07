@@ -214,9 +214,3 @@ class MatchingLayer(nn.Module):
         context = torch.matmul(attention_probs, inputs)
         matching = self._matching(torch.cat([inputs, context], dim=-1))
         return self._layernorm(matching)
-
-
-def get_all_reduce_mean(tensor):
-    torch.distributed.all_reduce(tensor, op=torch.distributed.ReduceOp.SUM)
-    tensor = tensor / torch.distributed.get_world_size()
-    return tensor

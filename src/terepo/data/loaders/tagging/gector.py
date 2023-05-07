@@ -82,12 +82,12 @@ class TERepoGECToRDataLoader(TERepoGECToRBaseDataLoader):
         return input_ids, attention_mask, offsets, original_mask, label_ids, detect_tags
 
     def wrap_build_sample(self, example):
-        return self.build_sample(example)
-        # try:
-        #     return self.build_sample(example)
-        # except Exception as e:
-        #     logger.warning([e, example])
-        #     return [None] * 7
+        # return self.build_sample(example)
+        try:
+            return self.build_sample(example)
+        except Exception as e:
+            logger.warning([e, example])
+            return [None] * 7
 
     def collate_fn(self, inputs):
         (input_ids, attention_mask, offsets, original_mask, label_ids, d_tags) = map(list,

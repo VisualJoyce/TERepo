@@ -62,7 +62,7 @@ elif [ "$TASK" == "bea2019" ]; then
   TRAIN_FILES="${WORK_DIR}"/data/annotations/text_editing/en/synthetic/train:"${WORK_DIR}"/data/annotations/text_editing/en/fce/train:"${WORK_DIR}"/data/annotations/text_editing/en/lang8/train:"${WORK_DIR}"/data/annotations/text_editing/en/nucle/train:"${WORK_DIR}"/data/annotations/text_editing/en/wi+locness/train
   EVAL_FILES="${WORK_DIR}"/data/annotations/text_editing/en/fce/dev@"${WORK_DIR}"/data/annotations/text_editing/en/fce/test@"${WORK_DIR}"/data/annotations/text_editing/en/wi+locness/dev@"${WORK_DIR}"/data/annotations/text_editing/en/conll2014/test
   EVALUATOR_SUBNAMES=m2scorer
-  MAX_STEPS=30000
+  MAX_STEPS=300000
   LEARNING_RATE=5e-5
 elif [ "$TASK" == "wi+locness" ]; then
   LANG=en
@@ -108,6 +108,7 @@ export LD_LIBRARY_PATH=$ANACONDA_PATH/lib
 #CUDA_VISIBLE_DEVICES=$GPU_IDS PYTHONPATH="${WORK_DIR}"/src python3 \
 CUDA_VISIBLE_DEVICES=$GPU_IDS PYTHONPATH="${WORK_DIR}"/src torchrun --nproc_per_node="$NUM_GPU" --master_port=$MASTER_PORT \
   "${PROJECT_DIR}"/train.py \
+  --run_name "$UUID" \
   --train_files "${TRAIN_FILES}" \
   --train_loader_names tagging --train_loader_subnames $MODEL_TYPE \
   --eval_files "${EVAL_FILES}" \

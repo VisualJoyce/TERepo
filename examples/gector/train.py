@@ -148,8 +148,10 @@ def main():
         # set the wandb project where this run will be logged
         entity="visualjoyce",
         project=f"{model_args.model_cls}",
+        group=training_args.run_name,
         # track hyperparameters and run metadata
         config={
+            "uuid": training_args.run_name,
             "learning_rate": training_args.learning_rate,
             "dataset": data_args.train_files,
             "steps": training_args.max_steps,
