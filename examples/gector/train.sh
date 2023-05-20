@@ -22,9 +22,6 @@ else
   exit
 fi
 
-MAX_STEPS=200000
-STEPS=1000
-LEARNING_RATE=1e-5
 PYTHON_BIN=$(which python)
 ANACONDA_PATH=${PYTHON_BIN%%/bin/python}
 NUM_GPU=$((1+$(echo "$GPU_IDS"| tr -d -c ',' | wc -m)))
@@ -46,7 +43,6 @@ elif [ "$TASK" == "fcgec" ]; then
   EVAL_GOLD_FILE="${WORK_DIR}"/data/annotations/text_editing/zh/fcgec/FCGEC_valid.txt
   EVALUATOR_SUBNAMES=cherrant
   MAX_STEPS=10000
-  STEPS=100
   LEARNING_RATE=1e-5
 elif [ "$TASK" == "mcscset" ]; then
   LANG=zh
@@ -55,35 +51,41 @@ elif [ "$TASK" == "mcscset" ]; then
   EVAL_GOLD_FILE="${WORK_DIR}"/data/annotations/text_editing/zh/mcscset/valid_gold.txt
   EVALUATOR_SUBNAMES=cherrant
   MAX_STEPS=20000
-  LEARNING_RATE=5e-5
-  STEPS=100
-elif [ "$TASK" == "bea2019" ]; then
+  LEARNING_RATE=1e-5
+elif [ "$TASK" == "synthetic" ]; then
   LANG=en
   TRAIN_FILES="${WORK_DIR}"/data/annotations/text_editing/en/synthetic/train:"${WORK_DIR}"/data/annotations/text_editing/en/fce/train:"${WORK_DIR}"/data/annotations/text_editing/en/lang8/train:"${WORK_DIR}"/data/annotations/text_editing/en/nucle/train:"${WORK_DIR}"/data/annotations/text_editing/en/wi+locness/train
   EVAL_FILES="${WORK_DIR}"/data/annotations/text_editing/en/fce/dev@"${WORK_DIR}"/data/annotations/text_editing/en/fce/test@"${WORK_DIR}"/data/annotations/text_editing/en/wi+locness/dev@"${WORK_DIR}"/data/annotations/text_editing/en/conll2014/test
   EVALUATOR_SUBNAMES=m2scorer
+  MAX_STEPS=1500000
+  LEARNING_RATE=1e-5
+elif [ "$TASK" == "bea2019" ]; then
+  LANG=en
+  TRAIN_FILES="${WORK_DIR}"/data/annotations/text_editing/en/fce/train:"${WORK_DIR}"/data/annotations/text_editing/en/lang8/train:"${WORK_DIR}"/data/annotations/text_editing/en/nucle/train:"${WORK_DIR}"/data/annotations/text_editing/en/wi+locness/train
+  EVAL_FILES="${WORK_DIR}"/data/annotations/text_editing/en/fce/dev@"${WORK_DIR}"/data/annotations/text_editing/en/fce/test@"${WORK_DIR}"/data/annotations/text_editing/en/wi+locness/dev@"${WORK_DIR}"/data/annotations/text_editing/en/conll2014/test
+  EVALUATOR_SUBNAMES=m2scorer
   MAX_STEPS=300000
-  LEARNING_RATE=5e-5
+  LEARNING_RATE=1e-5
 elif [ "$TASK" == "wi+locness" ]; then
   LANG=en
   TRAIN_FILES="${WORK_DIR}"/data/annotations/text_editing/en/wi+locness/train
   EVAL_FILES="${WORK_DIR}"/data/annotations/text_editing/en/fce/dev@"${WORK_DIR}"/data/annotations/text_editing/en/fce/test@"${WORK_DIR}"/data/annotations/text_editing/en/wi+locness/dev
-  EVALUATOR_SUBNAMES=errant
+  EVALUATOR_SUBNAMES=m2scorer
   MAX_STEPS=10000
-  LEARNING_RATE=1e-6
+  LEARNING_RATE=1e-5
 elif [ "$TASK" == "nucle+wi+locness" ]; then
   LANG=en
   TRAIN_FILES="${WORK_DIR}"/data/annotations/text_editing/en/nucle/train:"${WORK_DIR}"/data/annotations/text_editing/en/wi+locness/train
   EVAL_FILES="${WORK_DIR}"/data/annotations/text_editing/en/fce/dev@"${WORK_DIR}"/data/annotations/text_editing/en/fce/test@"${WORK_DIR}"/data/annotations/text_editing/en/wi+locness/dev
-  EVALUATOR_SUBNAMES=errant
+  EVALUATOR_SUBNAMES=m2scorer
   MAX_STEPS=10000
-  LEARNING_RATE=1e-6
+  LEARNING_RATE=1e-5
 else
   exit
 fi
 
 STEPS=$((MAX_STEPS/100))
-BATCH_SIZE=128
+BATCH_SIZE=256
 MODEL_DIR="${WORK_DIR}"/data/output/text_editing/$LANG/gec/"${MODEL_CLS}"-"${MODEL_NAME}"-"${TASK}"/${UUID}
 
 GPU_TYPE=$(nvidia-smi -q | grep "Product Name" | head -n 1 | awk -F':' '{print $2}' | xargs echo -n)

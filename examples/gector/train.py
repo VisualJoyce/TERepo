@@ -146,9 +146,9 @@ def main():
 
     wandb.init(
         # set the wandb project where this run will be logged
-        entity="visualjoyce",
-        project=f"{model_args.model_cls}",
-        group=training_args.run_name,
+        # entity="visualjoyce",
+        project='terepo-gector',
+        group=f"{model_args.model_cls}",
         # track hyperparameters and run metadata
         config={
             "uuid": training_args.run_name,
