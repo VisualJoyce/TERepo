@@ -27,6 +27,7 @@ The datasets used are publicly available online.
 
 * MuCGEC 
 * FCGEC
+* MCSCSet
 
 ```shell
 PYTHONPATH=src python3.9 preprocess/text_editing/mucgec_to_wds.py \
@@ -36,9 +37,10 @@ PYTHONPATH=src python3.9 preprocess/text_editing/mucgec_to_wds.py \
 ### Training
 
 ```shell
-bash train_gector.sh gector_focal gec-zh-gector-bert-large 0 mucgec "--focal_gamma 2"
+bash examples/gector/train.sh gector_focal aihijo/gec-zh-gector-bert-large 0 mucgec "--focal_gamma=2"
+bash examples/gector/train.sh gector_focal aihijo/gec-zh-gector-bert-large 0 fcgec "--focal_gamma=2"
+bash examples/gector/train.sh gector_focal aihijo/gec-zh-gector-bert-large 0 mcscset "--focal_gamma=2"
 ```
-
 
 ### Predicting
 

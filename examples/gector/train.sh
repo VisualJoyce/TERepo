@@ -64,7 +64,7 @@ elif [ "$TASK" == "bea2019" ]; then
   TRAIN_FILES="${WORK_DIR}"/data/annotations/text_editing/en/fce/train:"${WORK_DIR}"/data/annotations/text_editing/en/lang8/train:"${WORK_DIR}"/data/annotations/text_editing/en/nucle/train:"${WORK_DIR}"/data/annotations/text_editing/en/wi+locness/train
   EVAL_FILES="${WORK_DIR}"/data/annotations/text_editing/en/fce/dev@"${WORK_DIR}"/data/annotations/text_editing/en/fce/test@"${WORK_DIR}"/data/annotations/text_editing/en/wi+locness/dev@"${WORK_DIR}"/data/annotations/text_editing/en/conll2014/test
   EVALUATOR_SUBNAMES=m2scorer
-  MAX_STEPS=300000
+  MAX_STEPS=10000
   LEARNING_RATE=1e-5
 elif [ "$TASK" == "wi+locness" ]; then
   LANG=en
